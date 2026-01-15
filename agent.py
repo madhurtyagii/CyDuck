@@ -1,114 +1,111 @@
-import os
-from datetime import datetime
-import json
-from pathlib import Path
-from dotenv import load_dotenv
 from groq import Groq
+import os
+from dotenv import load_dotenv
+import json
+from datetime import datetime
 
+# Load environment variables
 load_dotenv()
 
 class CyDuckAgent:
     def __init__(self):
-        # Initialize Groq client
-        api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            raise ValueError("GROQ_API_KEY not found in environment variables!")
+        self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        self.model = "llama-3.3-70b-versatile"
+        self.memory_file = "cyduck_memory/conversations.json"
+        self.system_prompt = """You are CyDuck, an intelligent AI assistant with memory created by Madhur Tyagi, a BCA student and AI Engineer from India. 
+
+When asked about your creator or who made you, always mention that you were created by Madhur Tyagi.
+
+You are helpful, friendly, and remember past conversations. You provide clear, concise answers and engage in natural dialogue."""
         
-        self.client = Groq(api_key=api_key)
-        self.model_name = "llama-3.3-70b-versatile"  # Fast and powerful!
+        # Create memory directory if it doesn't exist
+        os.makedirs("cyduck_memory", exist_ok=True)
         
-        # Create memory storage directory
-        self.memory_dir = Path("cyduck_memory")
-        self.memory_dir.mkdir(exist_ok=True)
-        
-        # Chat history file
-        self.history_file = self.memory_dir / "chat_history.json"
-        self.load_history()
+        # Initialize memory file if it doesn't exist
+        if not os.path.exists(self.memory_file):
+            with open(self.memory_file, 'w') as f:
+                json.dump([], f)
     
-    def load_history(self):
-        """Load chat history from file"""
-        if self.history_file.exists():
-            with open(self.history_file, 'r', encoding='utf-8') as f:
-                self.chat_history = json.load(f)
-        else:
-            self.chat_history = []
-    
-    def save_history(self):
-        """Save chat history to file"""
-        with open(self.history_file, 'w', encoding='utf-8') as f:
-            json.dump(self.chat_history, f, indent=2, ensure_ascii=False)
-    
-    def get_recent_context(self, limit=5):
-        """Get recent conversation context"""
-        recent = self.chat_history[-limit:] if len(self.chat_history) > 0 else []
-        context = []
-        for msg in recent:
-            context.append({"role": "user", "content": msg['user']})
-            context.append({"role": "assistant", "content": msg['assistant']})
-        return context
-    
-    def generate_response(self, user_message, user_id="default"):
-        """Generate AI response with conversation memory using Groq"""
+    def load_memory(self):
+        """Load conversation history from file"""
         try:
-            # Get conversation context
-            context = self.get_recent_context(limit=3)
-            
-            # Build messages array
-            messages = [
-                {
-                    "role": "system",
-                    "content": """You are CyDuck 🦆, a helpful AI assistant built by Madhur Tyagi. 
-You are friendly, knowledgeable, and remember past conversations.
-Keep responses concise, helpful, and engaging."""
-                }
-            ]
-            
-            # Add context
-            messages.extend(context)
-            
-            # Add current message
+            with open(self.memory_file, 'r') as f:
+                return json.load(f)
+        except:
+            return []
+    
+    def save_memory(self, messages):
+        """Save conversation history to file"""
+        with open(self.memory_file, 'w') as f:
+            json.dump(messages, f, indent=2)
+    
+    def clear_memory(self):
+        """Clear all conversation history"""
+        with open(self.memory_file, 'w') as f:
+            json.dump([], f)
+    
+    def chat(self, user_message):
+        """Send message and get response"""
+        # Load conversation history
+        messages = self.load_memory()
+        
+        # Add system prompt if this is the first message
+        if len(messages) == 0:
             messages.append({
-                "role": "user",
-                "content": user_message
+                "role": "system",
+                "content": self.system_prompt
             })
-            
-            # Call Groq API
-            chat_completion = self.client.chat.completions.create(
-                messages=messages,
-                model=self.model_name,
+        
+        # Add user message
+        messages.append({
+            "role": "user",
+            "content": user_message,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        # Get response from Groq
+        try:
+            response = self.client.chat.completions.create(
+                messages=[{"role": m["role"], "content": m["content"]} for m in messages],
+                model=self.model,
                 temperature=0.7,
-                max_tokens=500,
-                top_p=1,
-                stream=False
+                max_tokens=1024
             )
             
-            ai_response = chat_completion.choices[0].message.content.strip()
+            assistant_message = response.choices[0].message.content
             
-            # Save to history
-            self.chat_history.append({
-                "timestamp": datetime.now().isoformat(),
-                "user_id": user_id,
-                "user": user_message,
-                "assistant": ai_response
+            # Add assistant response to memory
+            messages.append({
+                "role": "assistant",
+                "content": assistant_message,
+                "timestamp": datetime.now().isoformat()
             })
             
-            # Keep only last 100 messages
-            if len(self.chat_history) > 100:
-                self.chat_history = self.chat_history[-100:]
+            # Save updated memory
+            self.save_memory(messages)
             
-            self.save_history()
-            
-            return ai_response
+            return assistant_message
             
         except Exception as e:
-            return f"Oops! CyDuck had a hiccup: {str(e)}"
+            return f"Error: {str(e)}"
+
+# Create global agent instance
+agent = CyDuckAgent()
+
+if __name__ == "__main__":
+    # Test the agent
+    print("CyDuck Agent initialized!")
+    print("Type 'quit' to exit, 'clear' to clear memory\n")
     
-    def get_chat_history(self, limit=10):
-        """Get recent chat history"""
-        return self.chat_history[-limit:] if self.chat_history else []
-    
-    def clear_history(self):
-        """Clear all chat history"""
-        self.chat_history = []
-        self.save_history()
-        return "Chat history cleared! 🦆"
+    while True:
+        user_input = input("You: ")
+        
+        if user_input.lower() == 'quit':
+            break
+        elif user_input.lower() == 'clear':
+            agent.clear_memory()
+            print("Memory cleared!")
+            continue
+        
+        response = agent.chat(user_input)
+        print(f"CyDuck: {response}\n")
