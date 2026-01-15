@@ -11,3 +11,6 @@ pydantic[email]==2.9.2
 python-dotenv==1.0.1
 requests
 python-telegram-bot
+flask
+groq
+

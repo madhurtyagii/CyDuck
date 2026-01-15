@@ -1,13 +1,21 @@
-import requests
+import os
 from datetime import datetime
 import json
-import os
 from pathlib import Path
+from dotenv import load_dotenv
+from groq import Groq
+
+load_dotenv()
 
 class CyDuckAgent:
     def __init__(self):
-        self.model_url = "http://localhost:11434/api/generate"
-        self.model_name = "qwen2.5:7b"
+        # Initialize Groq client
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY not found in environment variables!")
+        
+        self.client = Groq(api_key=api_key)
+        self.model_name = "llama-3.3-70b-versatile"  # Fast and powerful!
         
         # Create memory storage directory
         self.memory_dir = Path("cyduck_memory")
@@ -33,59 +41,65 @@ class CyDuckAgent:
     def get_recent_context(self, limit=5):
         """Get recent conversation context"""
         recent = self.chat_history[-limit:] if len(self.chat_history) > 0 else []
-        context = ""
+        context = []
         for msg in recent:
-            context += f"User: {msg['user']}\nCyDuck: {msg['assistant']}\n\n"
+            context.append({"role": "user", "content": msg['user']})
+            context.append({"role": "assistant", "content": msg['assistant']})
         return context
     
     def generate_response(self, user_message, user_id="default"):
-        """Generate AI response with conversation memory"""
+        """Generate AI response with conversation memory using Groq"""
         try:
             # Get conversation context
             context = self.get_recent_context(limit=3)
             
-            # Build prompt with context
-            system_prompt = """You are CyDuck 🦆, a helpful AI assistant built by Madhur Tyagi. 
+            # Build messages array
+            messages = [
+                {
+                    "role": "system",
+                    "content": """You are CyDuck 🦆, a helpful AI assistant built by Madhur Tyagi. 
 You are friendly, knowledgeable, and remember past conversations.
-Keep responses concise and helpful."""
-            
-            prompt = f"{system_prompt}\n\nRecent conversation:\n{context}\nUser: {user_message}\nCyDuck:"
-            
-            payload = {
-                "model": self.model_name,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.7,
-                    "max_tokens": 500
+Keep responses concise, helpful, and engaging."""
                 }
-            }
+            ]
             
-            response = requests.post(self.model_url, json=payload, timeout=60)
+            # Add context
+            messages.extend(context)
             
-            if response.status_code == 200:
-                ai_response = response.json()['response'].strip()
-                
-                # Save to history
-                self.chat_history.append({
-                    "timestamp": datetime.now().isoformat(),
-                    "user_id": user_id,
-                    "user": user_message,
-                    "assistant": ai_response
-                })
-                
-                # Keep only last 100 messages
-                if len(self.chat_history) > 100:
-                    self.chat_history = self.chat_history[-100:]
-                
-                self.save_history()
-                
-                return ai_response
-            else:
-                return f"Error: Ollama returned status {response.status_code}"
-                
-        except requests.exceptions.ConnectionError:
-            return "Oops! CyDuck can't connect to Ollama. Make sure it's running (ollama serve)"
+            # Add current message
+            messages.append({
+                "role": "user",
+                "content": user_message
+            })
+            
+            # Call Groq API
+            chat_completion = self.client.chat.completions.create(
+                messages=messages,
+                model=self.model_name,
+                temperature=0.7,
+                max_tokens=500,
+                top_p=1,
+                stream=False
+            )
+            
+            ai_response = chat_completion.choices[0].message.content.strip()
+            
+            # Save to history
+            self.chat_history.append({
+                "timestamp": datetime.now().isoformat(),
+                "user_id": user_id,
+                "user": user_message,
+                "assistant": ai_response
+            })
+            
+            # Keep only last 100 messages
+            if len(self.chat_history) > 100:
+                self.chat_history = self.chat_history[-100:]
+            
+            self.save_history()
+            
+            return ai_response
+            
         except Exception as e:
             return f"Oops! CyDuck had a hiccup: {str(e)}"
     

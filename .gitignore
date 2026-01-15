@@ -1,0 +1,18 @@
+# Environment variables (API keys)
+.env
+
+# Memory storage
+cyduck_memory/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
+backend/venv/
+
+# OS files
+.DS_Store
+Thumbs.db
