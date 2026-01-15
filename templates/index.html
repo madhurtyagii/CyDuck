@@ -3,56 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CyDuck AI Assistant</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>CyDuck - AI Assistant 🦆</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🦆 CyDuck AI Assistant</h1>
-            <p>Powered by Ollama</p>
+            <p>Your intelligent companion with memory!</p>
+            <button onclick="clearHistory()" class="clear-btn">Clear History</button>
         </div>
         
-        <div class="chat-box" id="chatBox"></div>
+        <div class="chat-box" id="chatBox">
+            <div class="message bot-message">
+                <strong>CyDuck:</strong> Quack! 🦆 I'm CyDuck, your AI assistant with memory! Ask me anything!
+            </div>
+        </div>
+        
+        <div class="typing-indicator" id="typingIndicator" style="display: none;">
+            <span></span>
+            <span></span>
+            <span></span>
+            CyDuck is thinking...
+        </div>
         
         <div class="input-area">
-            <input type="text" id="userInput" placeholder="Ask CyDuck anything..." />
+            <input type="text" id="userInput" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
             <button onclick="sendMessage()">Send</button>
         </div>
     </div>
 
     <script>
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
         function sendMessage() {
             const input = document.getElementById('userInput');
             const message = input.value.trim();
-            if (!message) return;
-
-            addMessage(message, 'user');
+            
+            if (message === '') return;
+            
+            // Display user message
+            addMessage('user', message);
             input.value = '';
-
+            
+            // Show typing indicator
+            showTyping();
+            
+            // Send to backend
             fetch('/chat', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({message: message})
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    message: message,
+                    user_id: 'web_user_' + Date.now()
+                })
             })
-            .then(res => res.json())
+            .then(response => response.json())
             .then(data => {
-                addMessage(data.response, 'bot');
+                hideTyping();
+                addMessage('bot', data.response);
+            })
+            .catch(error => {
+                hideTyping();
+                addMessage('bot', 'Oops! Something went wrong. Make sure Ollama is running! 🦆');
+                console.error('Error:', error);
             });
         }
 
-        function addMessage(text, sender) {
+        function addMessage(type, text) {
             const chatBox = document.getElementById('chatBox');
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `message ${sender}`;
-            msgDiv.textContent = text;
-            chatBox.appendChild(msgDiv);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            
+            const label = type === 'user' ? 'You' : 'CyDuck';
+            messageDiv.innerHTML = `<strong>${label}:</strong> ${text}`;
+            
+            chatBox.appendChild(messageDiv);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        document.getElementById('userInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') sendMessage();
-        });
+        function showTyping() {
+            document.getElementById('typingIndicator').style.display = 'flex';
+        }
+
+        function hideTyping() {
+            document.getElementById('typingIndicator').style.display = 'none';
+        }
+
+        function clearHistory() {
+            if (!confirm('Clear all chat history? This cannot be undone!')) return;
+            
+            fetch('/clear', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('chatBox').innerHTML = `
+                    <div class="message bot-message">
+                        <strong>CyDuck:</strong> ${data.message}
+                    </div>
+                `;
+            });
+        }
     </script>
 </body>
 </html>
