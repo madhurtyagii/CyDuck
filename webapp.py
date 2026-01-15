@@ -1,9 +1,7 @@
 from flask import Flask, render_template, request, jsonify
-from agent import CyDuckAgent
-import time
+from agent import agent
 
 app = Flask(__name__)
-agent = CyDuckAgent()
 
 @app.route('/')
 def home():
@@ -11,31 +9,21 @@ def home():
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    user_message = request.json.get('message')
-    user_id = request.json.get('user_id', 'web_user')
+    data = request.json
+    user_message = data.get('message', '')
     
-    # Simulate typing delay
-    time.sleep(0.5)
+    if not user_message:
+        return jsonify({'error': 'No message provided'}), 400
     
-    response = agent.generate_response(user_message, user_id)
+    # Get response from agent
+    response = agent.chat(user_message)  # <-- FIXED THIS LINE
+    
     return jsonify({'response': response})
 
-@app.route('/history', methods=['GET'])
-def get_history():
-    """Get chat history"""
-    limit = request.args.get('limit', 10, type=int)
-    history = agent.get_chat_history(limit)
-    return jsonify({'history': history})
-
 @app.route('/clear', methods=['POST'])
-def clear_history():
-    """Clear chat history"""
-    message = agent.clear_history()
-    return jsonify({'message': message})
+def clear():
+    agent.clear_memory()
+    return jsonify({'status': 'success'})
 
 if __name__ == '__main__':
-    import os
-    port = int(os.environ.get('PORT', 5000))
-    print(f"🦆 CyDuck Web App running on port {port}")
-    app.run(debug=False, port=port, host='0.0.0.0')
-
+    app.run(host='0.0.0.0', port=5000, debug=False)
