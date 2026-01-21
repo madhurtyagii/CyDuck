@@ -16,3 +16,4 @@ backend/venv/
 # OS files
 .DS_Store
 Thumbs.db
+cyduck.db
