@@ -12,7 +12,7 @@ class CyDuckAgent:
     def __init__(self):
         self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
         # self.model = "llama-3.3-70b-versatile" # Previous model
-        self.model = "llama-4-maverick-17b-128e-instruct" # Best available currently, Llama 4 Maverick
+        self.model = "meta-llama/llama-4-maverick-17b-128e-instruct" # Correct ID with prefix
         self.db_path = "cyduck.db"
         self.system_prompt = """You are CyDuck, a helpful and friendly AI assistant.
 
