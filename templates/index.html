@@ -3,116 +3,170 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CyDuck - AI Assistant 🦆</title>
+    <title>CyDuck AI 🦆</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🦆 CyDuck AI Assistant</h1>
-            <p>Your intelligent companion with memory!</p>
-            <button onclick="clearHistory()" class="clear-btn">Clear History</button>
+    <div class="sidebar">
+        <button class="new-chat-btn" onclick="newChat()">
+            <i class="fas fa-plus"></i> New Chat
+        </button>
+        <div class="history-list" id="historyList">
+            <!-- Sessions will appear here -->
         </div>
-        
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h1>CyDuck AI 🦆</h1>
+        </div>
+
         <div class="chat-box" id="chatBox">
             <div class="message bot-message">
-                <strong>CyDuck:</strong> Quack! 🦆 I'm CyDuck, your AI assistant with memory! Ask me anything!
+                Quack! 🦆 I'm CyDuck, your intelligent companion. How can I help you today?
             </div>
         </div>
-        
-        <div class="typing-indicator" id="typingIndicator" style="display: none;">
-            <span></span>
-            <span></span>
-            <span></span>
-            CyDuck is thinking...
-        </div>
-        
-        <div class="input-area">
-            <input type="text" id="userInput" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
-            <button onclick="sendMessage()">Send</button>
+
+        <div class="typing" id="typingIndicator">CyDuck is thinking...</div>
+
+        <div class="input-container">
+            <div class="input-wrapper">
+                <input type="text" id="userInput" placeholder="Ask anything..." onkeypress="handleKeyPress(event)">
+                <button class="send-btn" onclick="sendMessage()">Send</button>
+            </div>
         </div>
     </div>
 
     <script>
+        let currentSessionId = 'default';
+
+        window.onload = () => {
+            loadConversations();
+            newChat(); // Start fresh
+        };
+
         function handleKeyPress(event) {
-            if (event.key === 'Enter') {
-                sendMessage();
-            }
+            if (event.key === 'Enter') sendMessage();
         }
 
-        function sendMessage() {
-            const input = document.getElementById('userInput');
-            const message = input.value.trim();
-            
-            if (message === '') return;
-            
-            // Display user message
-            addMessage('user', message);
-            input.value = '';
-            
-            // Show typing indicator
-            showTyping();
-            
-            // Send to backend
-            fetch('/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                    message: message,
-                    user_id: 'web_user_' + Date.now()
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                hideTyping();
-                addMessage('bot', data.response);
-            })
-            .catch(error => {
-                hideTyping();
-                addMessage('bot', 'Oops! Something went wrong. Make sure Ollama is running! 🦆');
-                console.error('Error:', error);
-            });
-        }
-
-        function addMessage(type, text) {
-            const chatBox = document.getElementById('chatBox');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${type}-message`;
-            
-            const label = type === 'user' ? 'You' : 'CyDuck';
-            messageDiv.innerHTML = `<strong>${label}:</strong> ${text}`;
-            
-            chatBox.appendChild(messageDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        function showTyping() {
-            document.getElementById('typingIndicator').style.display = 'flex';
-        }
-
-        function hideTyping() {
-            document.getElementById('typingIndicator').style.display = 'none';
-        }
-
-        function clearHistory() {
-            if (!confirm('Clear all chat history? This cannot be undone!')) return;
-            
-            fetch('/clear', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('chatBox').innerHTML = `
-                    <div class="message bot-message">
-                        <strong>CyDuck:</strong> ${data.message}
+        async function loadConversations() {
+            const res = await fetch('/conversations');
+            const data = await res.json();
+            const list = document.getElementById('historyList');
+            list.innerHTML = '';
+            data.forEach(session => {
+                const item = document.createElement('div');
+                item.className = `history-item ${session.id === currentSessionId ? 'active' : ''}`;
+                item.innerHTML = `
+                    <span onclick="switchSession('${session.id}')" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                        <i class="far fa-message"></i> ${session.title || 'Untitled'}
+                    </span>
+                    <div class="history-actions">
+                        <button class="action-btn" onclick="renameChat('${session.id}')"><i class="fas fa-edit"></i></button>
+                        <button class="action-btn" onclick="deleteChat('${session.id}')"><i class="fas fa-trash"></i></button>
                     </div>
                 `;
+                list.appendChild(item);
             });
+        }
+
+        async function switchSession(id) {
+            currentSessionId = id;
+            document.getElementById('chatBox').innerHTML = '';
+            document.querySelectorAll('.history-item').forEach(i => i.classList.remove('active'));
+            
+            const res = await fetch(`/conversation/${id}`);
+            const messages = await res.json();
+            messages.forEach(m => addMessage(m.role, m.content, false));
+            loadConversations();
+        }
+
+        async function newChat() {
+            const res = await fetch('/conversation/new', { method: 'POST' });
+            const data = await res.json();
+            currentSessionId = data.session_id;
+            document.getElementById('chatBox').innerHTML = `
+                <div class="message bot-message">
+                    Quack! 🦆 How can I help you in this new session?
+                </div>
+            `;
+            loadConversations();
+        }
+
+        async function deleteChat(id) {
+            if (!confirm('Delete this chat?')) return;
+            await fetch(`/conversation/${id}`, { method: 'DELETE' });
+            if (currentSessionId === id) newChat();
+            else loadConversations();
+        }
+
+        async function renameChat(id) {
+            const newTitle = prompt('Enter new name:');
+            if (!newTitle) return;
+            await fetch(`/conversation/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({title: newTitle})
+            });
+            loadConversations();
+        }
+
+        function addMessage(role, content, isNew = true) {
+            const chatBox = document.getElementById('chatBox');
+            const div = document.createElement('div');
+            div.className = `message ${role === 'user' ? 'user-message' : 'bot-message'}`;
+            div.textContent = content;
+            chatBox.appendChild(div);
+            if (isNew) chatBox.scrollTop = chatBox.scrollHeight;
+            return div;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            input.value = '';
+            addMessage('user', message);
+            
+            const botMsgDiv = addMessage('assistant', '');
+            document.getElementById('typingIndicator').style.display = 'block';
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message, session_id: currentSessionId})
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullText = '';
+
+                while (true) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    lines.forEach(line => {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.substring(6));
+                                fullText += data.content;
+                                botMsgDiv.textContent = fullText;
+                                document.getElementById('chatBox').scrollTop = document.getElementById('chatBox').scrollHeight;
+                            } catch(e) {}
+                        }
+                    });
+                }
+            } catch (error) {
+                botMsgDiv.textContent = "Error connecting to server.";
+            } finally {
+                document.getElementById('typingIndicator').style.display = 'none';
+            }
         }
     </script>
 </body>
