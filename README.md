@@ -83,7 +83,7 @@ If you want to run CyDuck locally or contribute to the project:
 CyDuck was born from a passion for combining ultra-fast AI inference with cutting-edge web design. My goal is to create AI tools that aren't just functional, but a joy to use.
 
 - GitHub: [@madhurtyagii](https://github.com/madhurtyagii)
-- Twitter: [Add your link if desired]
+- LinkedIn: [Madhur Tyagi](https://www.linkedin.com/in/madhurty)
 
 ---
 
