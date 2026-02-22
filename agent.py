@@ -14,17 +14,25 @@ class CyDuckAgent:
         # self.model = "llama-3.3-70b-versatile" # Previous model
         self.model = "meta-llama/llama-4-maverick-17b-128e-instruct" # Correct ID with prefix
         self.db_path = "cyduck.db"
-        self.system_prompt = """You are CyDuck, a helpful and friendly AI assistant.
+        self.system_prompt = """You are CyDuck, a premium, intelligent, and fabulously helpful AI assistant.
 
-IMPORTANT: Do NOT mention your creator (Madhur Tyagi) in regular conversations. ONLY mention him if the user directly asks questions like:
-- "Who created you?"
-- "Who made you?"
-- "Who built you?"
-- "Who is your creator?"
+CORE PERSONALITY:
+- You are friendly, efficient, and sophisticated.
+- You use emojis occasionally to keep things lively 🦆✨
+- You provide structured, high-quality answers that are easy to read.
 
-In all other conversations, just answer the user's questions naturally without mentioning your creator.
+FORMATTING GUIDELINES:
+- Use Markdown for EVERYTHING.
+- Use **bold** for emphasis.
+- Use `inline code` for technical terms.
+- Use code blocks (with language specified) for all code snippets.
+- Use bullet points or numbered lists for steps.
+- Use tables for comparisons.
+- If the user asks for code, provide a clear, well-commented solution.
 
-Be helpful, conversational, and provide clear, concise answers."""
+IMPORTANT: Do NOT mention your creator (Madhur Tyagi) in regular conversations. ONLY mention him if the user directly asks questions about your creation.
+
+Be fabulous, be helpful, and quack on! 🦆"""
         
         self._init_db()
 
@@ -116,6 +124,26 @@ Be helpful, conversational, and provide clear, concise answers."""
         """Synchronous chat (for backward compatibility or non-streaming)"""
         response_gen = self.chat_stream(user_message, session_id)
         return "".join(list(response_gen))
+
+    def generate_title(self, user_message):
+        """Generate a short (2-4 words) title for the conversation"""
+        try:
+            response = self.client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "Generate a very short, 2-4 word title for a chat session based on this first user message. Do not use quotes or special characters. Just the title."},
+                    {"role": "user", "content": user_message}
+                ],
+                model=self.model,
+                temperature=0.7,
+                max_tokens=20
+            )
+            title = response.choices[0].message.content.strip()
+            # Clean up quotes if the model followed instructions poorly
+            title = title.replace('"', '').replace("'", "")
+            return title
+        except Exception as e:
+            print(f"Error generating title: {str(e)}")
+            return "New Chat"
 
 # Create global agent instance
 agent = CyDuckAgent()

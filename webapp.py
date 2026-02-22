@@ -85,8 +85,24 @@ def chat():
             return jsonify({'error': 'No message provided'}), 400
 
         def generate():
+            full_response = ""
             for chunk in agent.chat_stream(user_message, session_id):
+                full_response += chunk
                 yield f"data: {json.dumps({'content': chunk})}\n\n"
+            
+            # After stream completes, check if we need to auto-rename
+            try:
+                with sqlite3.connect(agent.db_path) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute('SELECT title FROM sessions WHERE id = ?', (session_id,))
+                    row = cursor.fetchone()
+                    if row and (row[0] == "New Chat" or row[0] == "Untitled"):
+                        new_title = agent.generate_title(user_message)
+                        cursor.execute('UPDATE sessions SET title = ? WHERE id = ?', (new_title, session_id))
+                        conn.commit()
+                        yield f"data: {json.dumps({'new_title': new_title})}\n\n"
+            except Exception as e:
+                print(f"Auto-rename error: {str(e)}")
         
         return Response(stream_with_context(generate()), mimetype='text/event-stream')
     

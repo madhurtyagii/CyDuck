@@ -128,11 +128,35 @@ body {
 }
 
 .header h1 {
-    font-size: 1.5rem;
-    background: var(--primary-gradient);
+    font-size: 1.8rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.title-text {
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
+    font-weight: 800;
+}
+
+.logo-emoji {
+    filter: drop-shadow(0 0 8px var(--accent));
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-3px);
+    }
 }
 
 .chat-box {
@@ -188,6 +212,109 @@ body {
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     backdrop-filter: blur(5px);
+}
+
+/* Markdown & Code Styling */
+.message-content h1,
+.message-content h2,
+.message-content h3 {
+    margin: 15px 0 10px 0;
+    color: var(--accent);
+}
+
+.message-content p {
+    margin-bottom: 12px;
+}
+
+.message-content ul,
+.message-content ol {
+    margin-left: 20px;
+    margin-bottom: 12px;
+}
+
+.message-content blockquote {
+    border-left: 4px solid var(--accent);
+    background: rgba(129, 140, 248, 0.1);
+    padding: 10px 15px;
+    margin: 10px 0;
+    border-radius: 0 8px 8px 0;
+}
+
+.message-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.message-content th,
+.message-content td {
+    padding: 10px;
+    border: 1px solid var(--glass-border);
+    text-align: left;
+}
+
+.message-content th {
+    background: rgba(129, 140, 248, 0.2);
+}
+
+.code-container {
+    position: relative;
+    margin: 15px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #1e1e1e;
+    border: 1px solid var(--glass-border);
+}
+
+.code-header {
+    background: #333;
+    padding: 5px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: #ccc;
+    border-bottom: 1px solid #444;
+}
+
+.copy-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: all 0.2s;
+}
+
+.copy-btn:hover {
+    background: var(--accent);
+}
+
+pre {
+    margin: 0 !important;
+    padding: 15px !important;
+    background: transparent !important;
+}
+
+code {
+    font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+    font-size: 0.9rem !important;
+    color: #e6edf3 !important;
+    /* Ensure visibility in case hljs fails */
+}
+
+.hljs {
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+.message-content pre {
+    overflow-x: auto;
 }
 
 .input-container {

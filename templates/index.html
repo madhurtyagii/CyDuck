@@ -1,12 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyDuck AI 🦆</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
+
 <body>
     <div class="sidebar">
         <button class="new-chat-btn" onclick="newChat()">
@@ -19,11 +24,11 @@
 
     <div class="main-content">
         <div class="header">
-            <h1>CyDuck AI 🦆</h1>
+            <h1><span class="title-text">CyDuck AI</span> <span class="logo-emoji">🦆</span></h1>
         </div>
 
         <div class="chat-box" id="chatBox">
-            <div class="message bot-message">
+            <div class="message bot-message message-content">
                 Quack! 🦆 I'm CyDuck, your intelligent companion. How can I help you today?
             </div>
         </div>
@@ -41,10 +46,50 @@
     <script>
         let currentSessionId = 'default';
 
+        // Configure marked for v12+ API
+        const renderer = new marked.Renderer();
+        renderer.code = function ({ text, lang }) {
+            const validLang = lang && hljs.getLanguage(lang) ? lang : 'plaintext';
+            const highlighted = hljs.highlight(text, { language: validLang }).value;
+            return `
+                <div class="code-container">
+                    <div class="code-header">
+                        <span>${validLang}</span>
+                        <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+                    </div>
+                    <pre><code class="hljs ${validLang}">${highlighted}</code></pre>
+                </div>
+            `;
+        };
+
+        marked.use({ renderer });
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+
+        function safeParse(text) {
+            try {
+                return marked.parse(text);
+            } catch (e) {
+                console.error("Markdown parse error:", e);
+                return text.replace(/\n/g, '<br>');
+            }
+        }
+
         window.onload = () => {
             loadConversations();
-            newChat(); // Start fresh
+            newChat();
         };
+
+        function copyToClipboard(btn) {
+            const code = btn.parentElement.nextElementSibling.querySelector('code').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                const originalText = btn.innerText;
+                btn.innerText = 'Copied!';
+                setTimeout(() => btn.innerText = originalText, 2000);
+            });
+        }
 
         function handleKeyPress(event) {
             if (event.key === 'Enter') sendMessage();
@@ -75,7 +120,7 @@
             currentSessionId = id;
             document.getElementById('chatBox').innerHTML = '';
             document.querySelectorAll('.history-item').forEach(i => i.classList.remove('active'));
-            
+
             const res = await fetch(`/conversation/${id}`);
             const messages = await res.json();
             messages.forEach(m => addMessage(m.role, m.content, false));
@@ -87,7 +132,7 @@
             const data = await res.json();
             currentSessionId = data.session_id;
             document.getElementById('chatBox').innerHTML = `
-                <div class="message bot-message">
+                <div class="message bot-message message-content">
                     Quack! 🦆 How can I help you in this new session?
                 </div>
             `;
@@ -106,8 +151,8 @@
             if (!newTitle) return;
             await fetch(`/conversation/${id}`, {
                 method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({title: newTitle})
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: newTitle })
             });
             loadConversations();
         }
@@ -115,8 +160,14 @@
         function addMessage(role, content, isNew = true) {
             const chatBox = document.getElementById('chatBox');
             const div = document.createElement('div');
-            div.className = `message ${role === 'user' ? 'user-message' : 'bot-message'}`;
-            div.textContent = content;
+            div.className = `message ${role === 'user' ? 'user-message' : 'bot-message message-content'}`;
+
+            if (role === 'assistant') {
+                div.innerHTML = safeParse(content);
+            } else {
+                div.textContent = content;
+            }
+
             chatBox.appendChild(div);
             if (isNew) chatBox.scrollTop = chatBox.scrollHeight;
             return div;
@@ -129,15 +180,15 @@
 
             input.value = '';
             addMessage('user', message);
-            
+
             const botMsgDiv = addMessage('assistant', '');
             document.getElementById('typingIndicator').style.display = 'block';
 
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({message, session_id: currentSessionId})
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message, session_id: currentSessionId })
                 });
 
                 const reader = response.body.getReader();
@@ -145,20 +196,25 @@
                 let fullText = '';
 
                 while (true) {
-                    const {done, value} = await reader.read();
+                    const { done, value } = await reader.read();
                     if (done) break;
-                    
+
                     const chunk = decoder.decode(value);
                     const lines = chunk.split('\n');
-                    
+
                     lines.forEach(line => {
                         if (line.startsWith('data: ')) {
                             try {
                                 const data = JSON.parse(line.substring(6));
-                                fullText += data.content;
-                                botMsgDiv.textContent = fullText;
-                                document.getElementById('chatBox').scrollTop = document.getElementById('chatBox').scrollHeight;
-                            } catch(e) {}
+                                if (data.content) {
+                                    fullText += data.content;
+                                    botMsgDiv.innerHTML = safeParse(fullText);
+                                    document.getElementById('chatBox').scrollTop = document.getElementById('chatBox').scrollHeight;
+                                }
+                                if (data.new_title) {
+                                    loadConversations(); // Refresh sidebar to show new title
+                                }
+                            } catch (e) { }
                         }
                     });
                 }
@@ -170,4 +226,5 @@
         }
     </script>
 </body>
+
 </html>
